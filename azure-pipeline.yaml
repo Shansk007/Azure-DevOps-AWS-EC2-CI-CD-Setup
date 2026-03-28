@@ -1,0 +1,79 @@
+trigger:
+- main
+
+pool:
+  name: ec2-agent
+
+stages:
+- stage: Install_Nginx
+  displayName: Install and Start NGINX
+  jobs:
+  - job: SetupNginx
+    displayName: Setup NGINX Server
+    steps:
+
+    - script: |
+        echo "Updating packages..."
+        sudo apt-get update -y
+
+        echo "Installing NGINX..."
+        sudo apt-get install -y nginx
+
+        echo "Starting NGINX..."
+        sudo systemctl start nginx
+
+        echo "Enabling NGINX on boot..."
+        sudo systemctl enable nginx
+
+        echo "Checking status..."
+        sudo systemctl status nginx
+      displayName: Install and Start NGINX
+
+
+---------------------------------------------------------------
+
+trigger:
+- main
+
+pool:
+  name: ec2-agent
+
+stages:
+- stage: Deploy_Website
+  displayName: Deploy Website on NGINX
+  jobs:
+  - job: Deploy
+    displayName: Copy Files & Restart NGINX
+    steps:
+
+    - checkout: self
+
+    - script: |
+        echo "Installing NGINX if not present..."
+
+        if ! command -v nginx &> /dev/null
+        then
+            if [ -f /etc/debian_version ]; then
+                sudo apt-get update -y
+                sudo apt-get install -y nginx
+            else
+                sudo yum update -y
+                sudo yum install -y nginx
+            fi
+        fi
+
+        echo "Cleaning default NGINX html folder..."
+        sudo rm -rf /var/www/html/*
+
+        echo "Copying website files..."
+        sudo cp -r $(System.DefaultWorkingDirectory)/* /var/www/html/
+
+        echo "Setting permissions..."
+        sudo chmod -R 755 /var/www/html
+
+        echo "Restarting NGINX..."
+        sudo systemctl restart nginx
+        sudo systemctl enable nginx
+
+        echo "Deployment completed!"
+      displayName: Deploy Website to NGINX
